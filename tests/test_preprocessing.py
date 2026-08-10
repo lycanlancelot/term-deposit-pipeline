@@ -68,6 +68,22 @@ def test_unseen_categories_do_not_break_transformation(fitted):
     assert not np.isnan(preprocessor.transform(altered)).any()
 
 
+def test_an_all_sentinel_training_period_keeps_the_pdays_column(dated):
+    """Nobody has a prior contact before 2008-10-21, so early windows are 100% sentinel.
+
+    A median imputer has nothing to learn from there and drops the feature, quietly
+    changing the feature set depending on which period the model is trained on.
+    """
+    earliest = dated.head(3000)
+    assert (earliest["pdays"] == -1).all()
+
+    preprocessor = build_preprocessor()
+    preprocessor.fit(earliest[feature_columns()])
+    names = list(preprocessor.get_feature_names_out())
+    assert "pdays" in names
+    assert "missingindicator_pdays" in names
+
+
 def test_target_encodes_subscriptions_as_one(dated):
     encoded = target_vector(dated)
     assert set(encoded.unique()) == {0, 1}

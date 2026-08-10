@@ -21,6 +21,10 @@ from term_deposit.data import TARGET
 #: with the real day counts and must not be scaled alongside them.
 PDAYS_SENTINEL = -1
 
+#: Stand-in for "not applicable". Observed values start at 1, so this cannot be confused
+#: with a real gap, and the paired indicator tells the model which rows it applies to.
+PDAYS_FILL = 0
+
 NUMERIC_FEATURES = ("age", "balance", "day", "campaign", "previous")
 SENTINEL_FEATURES = ("pdays",)
 CATEGORICAL_FEATURES = (
@@ -69,8 +73,25 @@ def build_preprocessor(include_duration: bool = False) -> ColumnTransformer:
         [
             ("sentinel", FunctionTransformer(_sentinel_to_missing, feature_names_out="one-to-one")),
             # add_indicator keeps "was this customer ever contacted before?" as its own
-            # signal instead of hiding it inside an imputed median.
-            ("impute", SimpleImputer(strategy="median", add_indicator=True)),
+            # signal instead of hiding it inside the imputed value.
+            #
+            # The fill is a constant outside the observed range (real values start at 1)
+            # rather than the median. "Days since a contact that never happened" has no
+            # meaningful central value, and the indicator already carries the fact. A
+            # median would also be undefined early in the campaign: nobody has a prior
+            # contact before 2008-10-21, so the first months are 100% sentinel and a
+            # median imputer silently drops the column.
+            (
+                "impute",
+                SimpleImputer(
+                    strategy="constant",
+                    fill_value=PDAYS_FILL,
+                    add_indicator=True,
+                    # Without this, scikit-learn drops a column it saw no values for,
+                    # which is exactly the all-sentinel case described above.
+                    keep_empty_features=True,
+                ),
+            ),
             ("scale", StandardScaler()),
         ]
     )
