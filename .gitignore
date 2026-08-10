@@ -11,3 +11,6 @@ __pycache__/
 # macOS
 .DS_Store
 __MACOSX/
+
+# Exercise brief (kept local, not published)
+ML : Applied Scientist take home.pdf
