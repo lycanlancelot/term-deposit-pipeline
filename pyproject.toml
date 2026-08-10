@@ -1,0 +1,23 @@
+[project]
+name = "term-deposit-pipeline"
+version = "0.1.0"
+description = "Predicting term deposit subscription from bank marketing campaign data"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "matplotlib>=3.9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.6",
+    "ipykernel>=6.29",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
