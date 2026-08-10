@@ -23,18 +23,34 @@ DEFAULT_K_FRACTIONS = (0.05, 0.10, 0.20)
 TIE_BREAK_SEED = 0
 
 
+def _ranked_indices(scores: np.ndarray) -> np.ndarray:
+    """Customer indices from most to least likely to subscribe, ties shuffled."""
+    scores = np.asarray(scores)
+    shuffled = np.random.default_rng(TIE_BREAK_SEED).permutation(len(scores))
+    return shuffled[np.argsort(-scores[shuffled], kind="stable")]
+
+
 def _top_k_mask(scores: np.ndarray, k_fraction: float) -> np.ndarray:
     if not 0 < k_fraction <= 1:
         raise ValueError(f"k_fraction must be in (0, 1], got {k_fraction}")
     scores = np.asarray(scores)
     k = max(1, round(len(scores) * k_fraction))
 
-    shuffled = np.random.default_rng(TIE_BREAK_SEED).permutation(len(scores))
-    ranked = shuffled[np.argsort(-scores[shuffled], kind="stable")][:k]
-
     mask = np.zeros(len(scores), dtype=bool)
-    mask[ranked] = True
+    mask[_ranked_indices(scores)[:k]] = True
     return mask
+
+
+def gains_curve(y_true, scores) -> tuple[np.ndarray, np.ndarray]:
+    """Share of the list called against share of all subscribers reached.
+
+    The campaign-planning view: "if we work down the ranked list, how much of the
+    available value have we captured by the time we stop?"
+    """
+    y_true = np.asarray(y_true)
+    captured = np.cumsum(y_true[_ranked_indices(scores)]) / y_true.sum()
+    called = np.arange(1, len(y_true) + 1) / len(y_true)
+    return called, captured
 
 
 def precision_at_k(y_true, scores, k_fraction: float) -> float:
