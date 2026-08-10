@@ -41,6 +41,69 @@ def _top_k_mask(scores: np.ndarray, k_fraction: float) -> np.ndarray:
     return mask
 
 
+def bootstrap_ci(
+    y_true,
+    scores,
+    metric,
+    n_resamples: int = 1000,
+    confidence: float = 0.95,
+    seed: int = 0,
+) -> tuple[float, float]:
+    """Percentile-bootstrap confidence interval for `metric(y_true, scores)`.
+
+    Resamples customers with replacement. Resamples that lose one of the two classes are
+    skipped, since ranking metrics are undefined on them; at this dataset's size that is
+    vanishingly rare.
+    """
+    y_true, scores = np.asarray(y_true), np.asarray(scores)
+    rng = np.random.default_rng(seed)
+
+    values = []
+    for _ in range(n_resamples):
+        index = rng.integers(0, len(y_true), len(y_true))
+        if y_true[index].min() == y_true[index].max():
+            continue
+        values.append(metric(y_true[index], scores[index]))
+
+    tail = (1 - confidence) / 2 * 100
+    low, high = np.percentile(values, [tail, 100 - tail])
+    return float(low), float(high)
+
+
+def bootstrap_delta_ci(
+    y_true,
+    scores_a,
+    scores_b,
+    metric,
+    n_resamples: int = 1000,
+    confidence: float = 0.95,
+    seed: int = 0,
+) -> tuple[float, float]:
+    """Paired-bootstrap CI for `metric(a) − metric(b)` on the same resamples.
+
+    Pairing matters: both models are scored on the identical resample each iteration, so
+    shared sampling noise cancels and the interval reflects the *difference* between the
+    models rather than the volatility of the test set. An interval covering zero means
+    the comparison cannot distinguish them on this data.
+    """
+    y_true = np.asarray(y_true)
+    scores_a, scores_b = np.asarray(scores_a), np.asarray(scores_b)
+    rng = np.random.default_rng(seed)
+
+    deltas = []
+    for _ in range(n_resamples):
+        index = rng.integers(0, len(y_true), len(y_true))
+        if y_true[index].min() == y_true[index].max():
+            continue
+        deltas.append(
+            metric(y_true[index], scores_a[index]) - metric(y_true[index], scores_b[index])
+        )
+
+    tail = (1 - confidence) / 2 * 100
+    low, high = np.percentile(deltas, [tail, 100 - tail])
+    return float(low), float(high)
+
+
 def gains_curve(y_true, scores) -> tuple[np.ndarray, np.ndarray]:
     """Share of the list called against share of all subscribers reached.
 
