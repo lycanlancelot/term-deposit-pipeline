@@ -84,18 +84,35 @@ constant fill outside the observed range with `keep_empty_features=True`. Chasin
 warning is also what surfaced the 10.4% → 49.1% shift in prior-contact share between
 periods, which became a substantive point in `INSIGHTS.md`.
 
-## 5. Where I overrode it
+## 5. Corrections, and who actually made them
 
-- **`class_weight="balanced"`** was in the original plan as a reflex for the 11.7%
-  positive rate. Removed: it barely moves a ranking, it inflates predicted probabilities,
-  and calibration is already the weakest part of the out-of-time result.
-- **Scope.** The consistent failure mode was proposing more abstraction, more model
-  variants and more configurability than three hours or the brief justified. The
-  `CLAUDE.md` rules helped, but this still needed active pushback.
+Worth separating, because "the AI caught its own mistake" and "I caught the AI's mistake"
+are different claims and the brief is asking about process.
+
+**Revised by the agent, mid-session:**
+
+- **`class_weight="balanced"`** was written into `PLAN.md` as a reflex for the 11.7%
+  positive rate, then removed before implementation: it barely moves a ranking, it
+  inflates predicted probabilities, and calibration is already the weakest part of the
+  out-of-time result. `PLAN.md` records the deviation rather than being quietly edited.
 - **Analytical precision in the write-up.** A draft of `INSIGHTS.md` presented "lift as a
   share of its ceiling" and "top-decile precision" as two separate findings. They are the
   same quantity — the ratio reduces algebraically to `precision@k`. Corrected to state it
   once, with the derivation.
+- **Attribution in this repository.** An earlier draft of the README credited me with
+  overriding decisions the agent had in fact revised on its own. Corrected, because a
+  transparency section that overstates human oversight is worse than an imperfect one.
+
+**Directed by me:**
+
+- Research the prior art before writing any code — which is what produced the provenance
+  correction in §2.
+- Commit at every step rather than in batches.
+- Keep the exercise brief out of a public repository.
+- Lead Part B with the causal argument rather than with model improvements.
+- **Scope discipline throughout.** Left alone the agent proposes more abstraction, more
+  model variants and more configurability than three hours or the brief justifies. The
+  committed `CLAUDE.md` is the standing instruction; it still needed active pushback.
 
 ## 6. What the agent was genuinely good at
 

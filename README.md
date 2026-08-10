@@ -126,16 +126,24 @@ Where it genuinely helped:
   against the dataset's date ordering; and the `pdays` median imputer silently dropped the
   column for early training windows where every value is the sentinel.
 
-Where I overrode it:
+Course corrections during the session — I have kept these attributed accurately, since
+the brief is asking how the work was actually produced:
 
-- It initially planned `class_weight="balanced"` as a reflex for the imbalance. Removed,
-  for the calibration reason above.
-- An early test asserted that shuffled rows would be rejected by the year recovery. That
-  test was wrong, not the code: a backwards month step is *defined* as a year boundary, so
-  the method cannot detect out-of-order rows at all. The test now documents the limitation
-  instead of pretending it does not exist.
-- Scope discipline generally — the interesting failure mode was proposing more
-  abstraction and more model variants than three hours or the brief justified.
+- **`class_weight="balanced"`** was written into `PLAN.md` as a reflex for the imbalance
+  and then removed before implementation, for the calibration reason above. That was the
+  agent revising its own plan, not me catching it.
+- **A test asserting that shuffled rows would be rejected** by the year recovery. The
+  test failed, and the test was wrong rather than the code: a backwards month step is
+  *defined* as a year boundary, so out-of-order rows cannot be detected at all. It now
+  documents the limitation instead of pretending it does not exist.
+- **Scope**, which needed steering from me throughout. Left alone the agent proposes more
+  abstraction, more model variants and more configurability than three hours or the brief
+  justifies. The committed `CLAUDE.md` is the standing instruction that keeps it in check.
+
+The decisions that were mine rather than the agent's: research the prior art before
+writing any code, commit at every step rather than in batches, keep the brief PDF out of
+a public repository, and lead Part B with the causal argument rather than with model
+improvements.
 
 ## Data
 
