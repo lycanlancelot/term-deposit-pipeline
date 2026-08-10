@@ -82,6 +82,36 @@ def reference_comparison(frame: pd.DataFrame, seed: int = SEED) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def segment_evaluation(frame: pd.DataFrame, seed: int = SEED) -> pd.DataFrame:
+    """Score the reference model separately on cold-call and re-contact customers.
+
+    The EDA found the test period is a different population mix from the training period
+    (prior-contact share 10.4% vs 49.1%), so a single AUC averages over two problems. One
+    model is fitted; only the *evaluation* is segmented, because that is the question —
+    "how does the deployed model do on each kind of customer?", not "should we train two
+    models?".
+    """
+    model, test = fit_reference_model(frame, seed=seed)
+    scores = pd.Series(
+        model.predict_proba(test[feature_columns()])[:, 1], index=test.index
+    )
+
+    segments = {
+        "all": test.index,
+        "cold call (pdays == -1)": test.index[test["pdays"] == -1],
+        "re-contact (pdays >= 0)": test.index[test["pdays"] >= 0],
+    }
+    rows = []
+    for name, index in segments.items():
+        segment_target = target_vector(test.loc[index])
+        if segment_target.nunique() < 2:
+            # Ranking metrics are undefined on an empty or one-class segment — possible
+            # on early slices of the data, where nobody has a prior contact yet.
+            continue
+        rows.append({"segment": name, "n": len(index), **evaluate(segment_target, scores.loc[index])})
+    return pd.DataFrame(rows)
+
+
 #: Chosen on the evidence from `reference_comparison`: out of time, logistic regression
 #: is statistically indistinguishable from gradient boosting on ROC-AUC (paired delta CI
 #: covers zero) and significantly better on PR-AUC. A tie breaks toward the model whose

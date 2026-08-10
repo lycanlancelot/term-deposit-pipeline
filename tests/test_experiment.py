@@ -7,6 +7,7 @@ from term_deposit.experiment import (
     SPLIT_STRATEGIES,
     reference_comparison,
     run_grid,
+    segment_evaluation,
 )
 from term_deposit.models import build_models
 
@@ -46,6 +47,23 @@ def test_reference_comparison_reports_paired_uncertainty(dated):
     for _, row in comparison.iterrows():
         for interval in (row.logistic_regression_ci, row.gradient_boosting_ci, row.delta_ci):
             assert interval[0] <= interval[1]
+
+
+def test_segment_evaluation_partitions_the_test_set(dated):
+    """Full frame: the reference model is cheap to fit, and the slice fixtures predate
+    the first re-contact (2008-10-21), which would leave that segment empty."""
+    segments = segment_evaluation(dated).set_index("segment")
+    assert (
+        segments.loc["cold call (pdays == -1)", "n"] + segments.loc["re-contact (pdays >= 0)", "n"]
+        == segments.loc["all", "n"]
+    )
+
+
+def test_segment_evaluation_skips_segments_it_cannot_score(dated):
+    """On an early slice nobody has been contacted before, so only viable rows appear."""
+    early = segment_evaluation(dated.iloc[:6000])
+    assert "re-contact (pdays >= 0)" not in set(early.segment)
+    assert len(early) >= 1
 
 
 def test_the_prior_baseline_ranks_no_better_than_chance(grid):

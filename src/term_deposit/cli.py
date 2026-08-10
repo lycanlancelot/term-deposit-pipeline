@@ -22,6 +22,7 @@ from term_deposit.experiment import (
     fit_reference_model,
     reference_comparison,
     run_grid,
+    segment_evaluation,
 )
 from term_deposit.metrics import gains_curve
 from term_deposit.models import SEED
@@ -124,6 +125,12 @@ def main() -> None:
 
     comparison = reference_comparison(frame, seed=arguments.seed)
     _write_reference_comparison(comparison, arguments.artifacts / "reference_comparison.md")
+
+    segments = segment_evaluation(frame, seed=arguments.seed)
+    segment_columns = ["segment", "n", "base_rate", "roc_auc", "pr_auc", "precision@10%"]
+    (arguments.artifacts / "segments.md").write_text(
+        segments[segment_columns].round(4).to_markdown(index=False) + "\n"
+    )
 
     model, test = fit_reference_model(frame, seed=arguments.seed)
     _write_gains_curve(model, test, arguments.artifacts / "gains_curve.png")
