@@ -15,6 +15,50 @@ requires collecting data this dataset cannot provide.
 
 ---
 
+## What the model finds about customers
+
+Before the critique, what the data actually says. These are **descriptive patterns of
+this campaign, not causal effects** — every one of them is filtered through who the bank
+chose to call (§1.1) — but they are still the observations any next step starts from.
+Coefficients from the reference model are in
+[artifacts/coefficients.md](artifacts/coefficients.md); segment rates come from the EDA.
+
+**Campaign history dominates everything demographic.** A previous successful campaign
+outcome converts at **64.7%** against the 11.7% base — the largest coefficient in the
+model (+1.18) apart from seasonality. And the segment evaluation
+([artifacts/segments.md](artifacts/segments.md)) shows the flip side: on customers with
+*no* campaign history the model manages only 0.606 AUC against 0.738 for re-contacts.
+Practically: **the warmest list is people we have successfully spoken to before, and for
+everyone else the bank is close to flying blind.** That asymmetry, not any demographic,
+is the first-order structure in this data.
+
+**When matters more than who.** March, September, October and December convert at 44–52%
+versus 7–9% for the volume months of May–August — and the two largest coefficients in
+the entire model are `month_oct` (+2.60) and `month_mar` (+1.60). The uncomfortable
+reading: the bank made the *most* calls in the *worst* months (May alone is 13,766
+calls at 6.7%). Some of this is confounded with the small, targeted lists of those
+months, which is exactly the selection problem of §1.1 — but as a hypothesis for testing,
+"call fewer people in better months" is free money if it survives an experiment.
+
+**Life stage beats income proxies.** Students (28.7%) and retirees (22.8%) are the two
+highest-converting occupations, and `job_retired` carries one of the few positive
+demographic coefficients (+0.40). Term deposits appeal to people with lump sums and low
+appetite for risk, at both ends of working life. Meanwhile having a **home loan** halves
+the subscription rate (7.7% vs 16.7%) — mortgage holders' spare cash is already spoken
+for. Fairness note: both findings steer targeting by age proxy, which is lawful here but
+is the first thing I would put through the fairness analysis before deployment.
+
+**The channel artefact.** `contact = "unknown"` converts at 4.1% versus 14.9% for
+cellular and carries a −0.76 coefficient. I read this as record-keeping vintage rather
+than customer behaviour — unknown-channel rows are concentrated in the early cold-call
+period — and would treat "improve contact metadata" as a data-engineering ticket, not a
+modelling insight.
+
+What I would *not* conclude: that calling causes any of these groups to subscribe at
+these rates. That distinction is the subject of the rest of this document.
+
+---
+
 ## 1. What this modelling strategy assumes, and where it breaks
 
 ### 1.1 That the data describes the decision we are about to make
@@ -90,8 +134,13 @@ Two population facts, not just rate drift:
 
 So the later campaign is substantially a *re-contact* operation aimed at a warm list,
 while the earlier one was cold calling. Training on one to predict the other is closer to
-transfer learning than to interpolation. A model reporting a single accuracy number
-conceals that entirely.
+transfer learning than to interpolation.
+
+The segmented evaluation ([artifacts/segments.md](artifacts/segments.md)) puts numbers on
+what the blended score conceals: the same fitted model scores **0.738 AUC on re-contact
+customers and 0.606 on cold calls**. Most of its skill lives in campaign-history
+features that cold-call customers do not have. One reported "0.683" is really a strong
+model and a near-guessing model averaged together.
 
 ### 1.5 That a good ranking is a good decision
 
@@ -104,6 +153,15 @@ threshold calibrated on the training period would be meaningless on the test per
 
 Ranking survives drift far better than calibration does. That is worth knowing before
 someone builds a business rule on the probability.
+
+The obvious treatment — isotonic recalibration on a rolling window of the most recent
+data — is implemented in `term_deposit.calibration` and plotted in
+[artifacts/reliability_curve.png](artifacts/reliability_curve.png). It helps (Brier
+0.273 → 0.243) and still falls short: the recalibrated mean reaches 0.117 against an
+observed 0.311, because the calibration window is itself stale by the time the test
+period arrives. On drift this fast, recalibration is necessary but not sufficient — the
+honest fix is refreshing the window continuously and monitoring the gap, not fitting one
+map and declaring victory.
 
 ### 1.6 That "lift" means what it appears to mean
 

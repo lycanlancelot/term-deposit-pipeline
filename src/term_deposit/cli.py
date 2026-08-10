@@ -13,6 +13,7 @@ import matplotlib
 
 matplotlib.use("Agg")  # No display in CI or a plain shell.
 import matplotlib.pyplot as plt
+import pandas as pd
 from sklearn.calibration import calibration_curve
 
 from term_deposit.calibration import recalibration_demo
@@ -79,6 +80,21 @@ def _write_reliability_curve(frame, seed: int, destination: Path) -> None:
     plt.close(figure)
 
 
+def _write_coefficients(model, destination: Path) -> None:
+    """The reference model's coefficients, sorted — the evidence behind INSIGHTS."""
+    coefficients = pd.Series(
+        model.named_steps["estimator"].coef_[0],
+        index=model.named_steps["features"].get_feature_names_out(),
+    ).sort_values(ascending=False)
+    table = coefficients.round(3).rename("coefficient").to_frame()
+    destination.write_text(
+        "# Reference model coefficients\n\n"
+        "Standardised inputs, so magnitudes are roughly comparable. Descriptive of the\n"
+        "campaign that generated the data — **not** causal effects; see INSIGHTS.md.\n\n"
+        + table.to_markdown() + "\n"
+    )
+
+
 def _format_ci(interval) -> str:
     return f"({interval[0]:.4f}, {interval[1]:.4f})"
 
@@ -133,6 +149,7 @@ def main() -> None:
     )
 
     model, test = fit_reference_model(frame, seed=arguments.seed)
+    _write_coefficients(model, arguments.artifacts / "coefficients.md")
     _write_gains_curve(model, test, arguments.artifacts / "gains_curve.png")
     _write_reliability_curve(frame, arguments.seed, arguments.artifacts / "reliability_curve.png")
 
