@@ -180,7 +180,8 @@ Stated here and in the README rather than left implicit:
 ## Review round
 
 A self-review against the brief after the first complete pass found six gaps, ranked by
-how likely a reviewer is to probe them. Each is one commit:
+how likely a reviewer is to probe them. Each is one commit. **All six are now done**;
+outcomes noted inline:
 
 1. **Uncertainty on the reported metrics.** The results table quotes AUC to four decimals
    with no confidence intervals. Add percentile-bootstrap CIs, and a *paired* bootstrap
@@ -189,11 +190,15 @@ how likely a reviewer is to probe them. Each is one commit:
    regression (0.6829) edges gradient boosting (0.6786), yet the gains curve and headline
    quote GBM. Decide on the evidence: if the paired CI covers zero they are statistically
    tied, and the tie should break toward the simpler, interpretable model.
+   *Outcome: ROC-AUC delta CI (−0.005, 0.014) — tied; PR-AUC delta CI (0.001, 0.023) —
+   logistic significantly better. Reference switched to logistic regression.*
 3. **Calibration is diagnosed but never treated.** §1.5 of INSIGHTS argues the level is
    wrong by 2x; add a reliability curve artifact and a rolling-recalibration demo showing
    the fix, not just the complaint.
 4. **The population shift is diagnosed but the evaluation never acts on it.** Report
    metrics separately for cold-call vs re-contact segments of the test period.
+   *Outcome: the blended 0.683 AUC splits into 0.738 on re-contacts and 0.606 on cold
+   calls — the model's skill lives mostly in campaign-history features.*
 5. **Part B asks for customer insights, not only critique.** Add a descriptive
    "what drives subscription" section backed by a coefficients artifact.
 6. **CI.** A GitHub Actions workflow running lint and tests on push.

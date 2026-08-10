@@ -114,7 +114,28 @@ are different claims and the brief is asking about process.
   model variants and more configurability than three hours or the brief justifies. The
   committed `CLAUDE.md` is the standing instruction; it still needed active pushback.
 
-## 6. What the agent was genuinely good at
+## 6. The review round
+
+After the first complete pass I asked the agent to grade the submission as if it were
+the evaluator. Its self-review found six gaps, which became six further commits
+(`docs: plan the review-round improvements` onward). The two that mattered most:
+
+- **The reference model contradicted the results table.** The out-of-time numbers showed
+  logistic regression edging gradient boosting, yet the gains curve and headline quoted
+  GBM — a default nobody re-examined after the numbers came in. A paired bootstrap
+  settled it: statistically tied on ROC-AUC, logistic significantly better on PR-AUC, so
+  the reference switched to the interpretable model.
+- **Part B answered "critique the model" thoroughly but "discover customer insights"
+  only in passing.** The brief asks for both. A descriptive findings section was added,
+  every claim tied to a coefficient or segment rate the artifacts reproduce.
+
+The pattern from §4 held during this round too: two more of the agent's own test
+fixtures were wrong on first write (a "noisy" fixture that was accidentally perfectly
+separable, and an exact float equality on a percentile), and its habit of piping test
+output through `tail` masked pytest's exit code twice, letting commits land before
+failures surfaced — both commits were amended once caught.
+
+## 7. What the agent was genuinely good at
 
 Catching its own errors when asked to verify rather than assert; refusing to publish the
 brief PDF publicly without flagging the consequence first; and research breadth — the

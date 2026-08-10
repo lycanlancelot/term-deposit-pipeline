@@ -16,12 +16,13 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.12+.
 ```bash
 make install    # uv sync — creates .venv from the committed lock file
 make train      # reproduces every number quoted in this repo (~55s)
-make test       # 47 tests
+make test       # 59 tests
 make lint       # ruff
 ```
 
-`make train` reads `data/dataset.csv` and writes `artifacts/results.csv`,
-`artifacts/results.md` and `artifacts/gains_curve.png`. It is seeded, so a second run
+`make train` reads `data/dataset.csv` and writes everything in `artifacts/`: the results
+grid, the reference-model comparison with bootstrap CIs, per-segment metrics, the model
+coefficients, and the gains and reliability curves. It is seeded, so a second run
 reproduces identical numbers.
 
 ## Results
@@ -41,9 +42,24 @@ half is an over-optimistic split. The 0.803 figure matches the range published f
 random-CV treatments of this data, which is a useful sign the pipeline is not doing
 anything exotic.
 
+**The reference model is logistic regression, chosen on evidence rather than habit.**
+Out of time, a paired bootstrap ([artifacts/reference_comparison.md](artifacts/reference_comparison.md))
+shows it statistically tied with gradient boosting on ROC-AUC (delta CI −0.005 to 0.014)
+and *significantly better* on PR-AUC (delta CI 0.001 to 0.023). A tie breaks toward the
+model whose coefficients can be read and challenged.
+
+Two evaluations that a single blended number would hide:
+
+- **Segments** ([artifacts/segments.md](artifacts/segments.md)): the same model scores
+  0.738 AUC on re-contact customers but 0.606 on cold calls — its skill lives mostly in
+  campaign-history features that cold-call customers do not have.
+- **Calibration** ([artifacts/reliability_curve.png](artifacts/reliability_curve.png)):
+  rolling isotonic recalibration improves Brier 0.273 → 0.243 but still under-predicts a
+  drifting base rate; discussed honestly in INSIGHTS §1.5.
+
 ![Out-of-time gains curve](artifacts/gains_curve.png)
 
-Calling the top 30% of the ranked list reaches 48% of all subscribers; the top 10%
+Calling the top 30% of the ranked list reaches 50% of all subscribers; the top 10%
 reaches 17%.
 
 ## Three decisions that shaped the pipeline
@@ -74,13 +90,15 @@ src/term_deposit/
   splits.py         out-of-time and random splits
   preprocessing.py  ColumnTransformer — leakage quarantine, sentinel handling
   models.py         prior baseline, logistic regression, gradient boosting
-  metrics.py        precision@k, lift, PR-AUC, calibration, gains curve
-  experiment.py     the evaluation grid
+  metrics.py        precision@k, lift, PR-AUC, bootstrap CIs, gains curve
+  experiment.py     the evaluation grid, reference comparison, segment evaluation
+  calibration.py    rolling isotonic recalibration
   power.py          sample sizing for the experiment proposed in INSIGHTS.md
   cli.py            `make train`
-tests/              47 tests over the load-bearing logic
+tests/              59 tests over the load-bearing logic
 notebooks/01_eda.ipynb
 artifacts/          committed outputs, so the numbers are checkable without running
+.github/workflows/  lint + tests on every push
 ```
 
 ## Deliberate scope decisions
