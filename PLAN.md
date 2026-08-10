@@ -177,6 +177,27 @@ Stated here and in the README rather than left implicit:
 - **No macro/socio-economic features**, because the dataset has none. Flagged in
   INSIGHTS as a known and material gap rather than quietly ignored.
 
+## Review round
+
+A self-review against the brief after the first complete pass found six gaps, ranked by
+how likely a reviewer is to probe them. Each is one commit:
+
+1. **Uncertainty on the reported metrics.** The results table quotes AUC to four decimals
+   with no confidence intervals. Add percentile-bootstrap CIs, and a *paired* bootstrap
+   on the logistic-vs-GBM difference, since that comparison decides item 2.
+2. **The reference model is inconsistent with the results.** Out of time, logistic
+   regression (0.6829) edges gradient boosting (0.6786), yet the gains curve and headline
+   quote GBM. Decide on the evidence: if the paired CI covers zero they are statistically
+   tied, and the tie should break toward the simpler, interpretable model.
+3. **Calibration is diagnosed but never treated.** §1.5 of INSIGHTS argues the level is
+   wrong by 2x; add a reliability curve artifact and a rolling-recalibration demo showing
+   the fix, not just the complaint.
+4. **The population shift is diagnosed but the evaluation never acts on it.** Report
+   metrics separately for cold-call vs re-contact segments of the test period.
+5. **Part B asks for customer insights, not only critique.** Add a descriptive
+   "what drives subscription" section backed by a coefficients artifact.
+6. **CI.** A GitHub Actions workflow running lint and tests on push.
+
 ## Verification
 
 - `uv run pytest` passes.
