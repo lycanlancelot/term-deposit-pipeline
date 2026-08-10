@@ -13,7 +13,9 @@ import matplotlib
 
 matplotlib.use("Agg")  # No display in CI or a plain shell.
 import matplotlib.pyplot as plt
+from sklearn.calibration import calibration_curve
 
+from term_deposit.calibration import recalibration_demo
 from term_deposit.data import add_campaign_date, load_raw
 from term_deposit.experiment import (
     REFERENCE_MODEL,
@@ -49,6 +51,27 @@ def _write_gains_curve(model, test, destination: Path) -> None:
     axis.set_xlabel("share of the customer list called")
     axis.set_ylabel("share of all subscribers reached")
     axis.set_title("Out-of-time gains curve, no leakage")
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(destination, dpi=150)
+    plt.close(figure)
+
+
+def _write_reliability_curve(frame, seed: int, destination: Path) -> None:
+    """Predicted vs observed rate by decile, before and after rolling recalibration."""
+    test_y, raw, recalibrated = recalibration_demo(frame, seed=seed)
+
+    figure, axis = plt.subplots(figsize=(6, 4.5))
+    for scores, label, colour in (
+        (raw, f"raw (mean {raw.mean():.3f})", "indianred"),
+        (recalibrated, f"recalibrated (mean {recalibrated.mean():.3f})", "steelblue"),
+    ):
+        observed, predicted = calibration_curve(test_y, scores, n_bins=10, strategy="quantile")
+        axis.plot(predicted, observed, marker="o", label=label, color=colour)
+    axis.plot([0, 1], [0, 1], ls="--", color="grey", label="perfectly calibrated")
+    axis.set_xlabel("mean predicted probability (decile bins)")
+    axis.set_ylabel("observed subscription rate")
+    axis.set_title(f"Reliability out of time — observed rate {test_y.mean():.3f}")
     axis.legend()
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
@@ -104,6 +127,7 @@ def main() -> None:
 
     model, test = fit_reference_model(frame, seed=arguments.seed)
     _write_gains_curve(model, test, arguments.artifacts / "gains_curve.png")
+    _write_reliability_curve(frame, arguments.seed, arguments.artifacts / "reliability_curve.png")
 
     print(reported.to_string(index=False))
     print(f"\nreference model: {REFERENCE_MODEL} — see reference_comparison.md for why")
