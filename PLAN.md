@@ -68,9 +68,35 @@ encoding double-counts the same fact.
 **Decision:** split into a `contacted_before` boolean plus a conditional value,
 and note the collinearity rather than silently encoding it twice.
 
+## Results (Part A complete)
+
+Produced by `make train`; full table in [artifacts/results.md](artifacts/results.md).
+ROC-AUC for gradient boosting:
+
+| evaluation | ROC-AUC | what it represents |
+| --- | --- | --- |
+| random split, with `duration` | 0.934 | what a typical public notebook reports |
+| random split, no `duration` | 0.803 | leakage removed, optimistic split retained |
+| **out-of-time split, no `duration`** | **0.679** | **what a future campaign would actually see** |
+
+Roughly half the usual headline is leakage and the other half is the split. The 0.803
+figure lands inside the 0.76–0.80 range published for honest random-CV treatments of this
+dataset, which is a check that the pipeline is not doing something exotic.
+
+Two findings from the split that feed Part B:
+
+- The training period runs at a **6.7%** subscription rate and the test period at
+  **31.1%**. The model predicts a mean of 0.148 against an observed 0.311 — it ranks
+  acceptably and is badly miscalibrated, which matters because expected value per call
+  depends on the level, not just the order.
+- Customers with a prior contact are **10.4%** of the training period but **49.1%** of
+  the test period, and nobody has a prior contact before 2008-10-21. The later campaign
+  is substantially a *re-contact* campaign, so this is partly a population shift rather
+  than pure drift.
+
 ## Part A — pipeline
 
-Sequence, one commit per step:
+Sequence, one commit per step. All steps below are done:
 
 1. **EDA notebook** — target rate, distributions, and evidence for the three
    findings above. Committed as the record of what was actually looked at.
@@ -81,8 +107,13 @@ Sequence, one commit per step:
    one-hot categoricals, scale numerics, `pdays` sentinel handling, `duration`
    quarantined behind an explicit flag.
 4. **Models** — prior/majority baseline, logistic regression, gradient boosting
-   (`HistGradientBoostingClassifier`). No tuning beyond defaults and class
-   weighting; the brief says not to optimise.
+   (`HistGradientBoostingClassifier`). No tuning; the brief says not to optimise.
+
+   *Changed during implementation:* I planned to use `class_weight="balanced"` and
+   did not. Reweighting barely moves a ranking — which is what precision@k and PR-AUC
+   measure — while inflating predicted probabilities, and the calibration column is
+   load-bearing here given the base-rate shift. The decision being modelled is "rank,
+   then call down the list until capacity runs out", not "threshold at 0.5".
 5. **Metrics** — PR-AUC, **lift / precision@k**, and a calibration check.
    Accuracy is excluded deliberately: predicting "no" for everyone scores 88.3%.
    Precision@k is framed as agent-hours — "if we can make k calls, how many
@@ -126,7 +157,7 @@ The larger share of the effort. Structure follows the three questions asked.
 
 ## Deliverables
 
-- [ ] Source code / pipeline (Part A)
+- [x] Source code / pipeline (Part A)
 - [ ] `INSIGHTS.md` (Part B)
 - [ ] `README.md` with setup, results, and a **Tool Stack** section
 - [ ] `AI_TRANSCRIPTS/` with session exports
