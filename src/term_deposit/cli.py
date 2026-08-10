@@ -15,7 +15,12 @@ matplotlib.use("Agg")  # No display in CI or a plain shell.
 import matplotlib.pyplot as plt
 
 from term_deposit.data import add_campaign_date, load_raw
-from term_deposit.experiment import fit_reference_model, run_grid
+from term_deposit.experiment import (
+    REFERENCE_MODEL,
+    fit_reference_model,
+    reference_comparison,
+    run_grid,
+)
 from term_deposit.metrics import gains_curve
 from term_deposit.models import SEED
 from term_deposit.preprocessing import feature_columns, target_vector
@@ -39,7 +44,7 @@ def _write_gains_curve(model, test, destination: Path) -> None:
     called, captured = gains_curve(target_vector(test), scores)
 
     figure, axis = plt.subplots(figsize=(6, 4.5))
-    axis.plot(called, captured, label="gradient boosting", color="steelblue")
+    axis.plot(called, captured, label=REFERENCE_MODEL.replace("_", " "), color="steelblue")
     axis.plot([0, 1], [0, 1], ls="--", color="grey", label="calling at random")
     axis.set_xlabel("share of the customer list called")
     axis.set_ylabel("share of all subscribers reached")
@@ -48,6 +53,31 @@ def _write_gains_curve(model, test, destination: Path) -> None:
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     plt.close(figure)
+
+
+def _format_ci(interval) -> str:
+    return f"({interval[0]:.4f}, {interval[1]:.4f})"
+
+
+def _write_reference_comparison(comparison, destination: Path) -> None:
+    lines = [
+        "# Reference model comparison",
+        "",
+        "Temporal split, no `duration`. CIs are 95% percentile bootstrap (n=1000); the",
+        "delta is a *paired* bootstrap of logistic minus GBM on identical resamples.",
+        "A delta interval covering zero means the models cannot be told apart here.",
+        "",
+        "| metric | logistic | 95% CI | GBM | 95% CI | delta (L−G) 95% CI |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for _, row in comparison.iterrows():
+        lines.append(
+            f"| {row.metric} | {row.logistic_regression:.4f} "
+            f"| {_format_ci(row.logistic_regression_ci)} "
+            f"| {row.gradient_boosting:.4f} | {_format_ci(row.gradient_boosting_ci)} "
+            f"| {_format_ci(row.delta_ci)} |"
+        )
+    destination.write_text("\n".join(lines) + "\n")
 
 
 def main() -> None:
@@ -69,11 +99,15 @@ def main() -> None:
     reported = results[REPORTED_COLUMNS].round(4)
     (arguments.artifacts / "results.md").write_text(reported.to_markdown(index=False) + "\n")
 
+    comparison = reference_comparison(frame, seed=arguments.seed)
+    _write_reference_comparison(comparison, arguments.artifacts / "reference_comparison.md")
+
     model, test = fit_reference_model(frame, seed=arguments.seed)
     _write_gains_curve(model, test, arguments.artifacts / "gains_curve.png")
 
     print(reported.to_string(index=False))
-    print(f"\nwrote results.csv, results.md and gains_curve.png to {arguments.artifacts}/")
+    print(f"\nreference model: {REFERENCE_MODEL} — see reference_comparison.md for why")
+    print(f"wrote artifacts to {arguments.artifacts}/")
 
 
 if __name__ == "__main__":

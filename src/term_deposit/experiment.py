@@ -12,8 +12,9 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import pandas as pd
+from sklearn.metrics import average_precision_score, roc_auc_score
 
-from term_deposit.metrics import evaluate
+from term_deposit.metrics import bootstrap_ci, bootstrap_delta_ci, evaluate
 from term_deposit.models import SEED, build_models
 from term_deposit.preprocessing import feature_columns, target_vector
 from term_deposit.splits import random_split, temporal_split
@@ -51,6 +52,43 @@ def run_grid(frame: pd.DataFrame, seed: int = SEED) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def reference_comparison(frame: pd.DataFrame, seed: int = SEED) -> pd.DataFrame:
+    """Can the honest evaluation actually tell logistic regression and GBM apart?
+
+    Both are fitted on the temporal split without `duration`, then compared with a
+    *paired* bootstrap — the same resamples score both models, so the interval reflects
+    the difference rather than test-set volatility. This is the evidence behind the
+    reference-model choice in `fit_reference_model`.
+    """
+    train, test = temporal_split(frame)
+    columns = feature_columns()
+    train_y, test_y = target_vector(train), target_vector(test)
+
+    scores = {}
+    for name in ("logistic_regression", "gradient_boosting"):
+        model = build_models(seed=seed)[name]
+        scores[name] = model.fit(train[columns], train_y).predict_proba(test[columns])[:, 1]
+
+    rows = []
+    for metric_name, metric in (("roc_auc", roc_auc_score), ("pr_auc", average_precision_score)):
+        row = {"metric": metric_name}
+        for name, model_scores in scores.items():
+            row[name] = metric(test_y, model_scores)
+            row[f"{name}_ci"] = bootstrap_ci(test_y, model_scores, metric)
+        row["delta_ci"] = bootstrap_delta_ci(
+            test_y, scores["logistic_regression"], scores["gradient_boosting"], metric
+        )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+#: Chosen on the evidence from `reference_comparison`: out of time, logistic regression
+#: is statistically indistinguishable from gradient boosting on ROC-AUC (paired delta CI
+#: covers zero) and significantly better on PR-AUC. A tie breaks toward the model whose
+#: coefficients can be read, explained and challenged.
+REFERENCE_MODEL = "logistic_regression"
+
+
 def fit_reference_model(frame: pd.DataFrame, seed: int = SEED):
     """The model this repository would actually propose: no leakage, evaluated in time.
 
@@ -59,6 +97,6 @@ def fit_reference_model(frame: pd.DataFrame, seed: int = SEED):
     """
     train, test = temporal_split(frame)
     columns = feature_columns()
-    model = build_models(seed=seed)["gradient_boosting"]
+    model = build_models(seed=seed)[REFERENCE_MODEL]
     model.fit(train[columns], target_vector(train))
     return model, test

@@ -2,7 +2,13 @@
 
 import pytest
 
-from term_deposit.experiment import SPLIT_STRATEGIES, run_grid
+from term_deposit.experiment import (
+    REFERENCE_MODEL,
+    SPLIT_STRATEGIES,
+    reference_comparison,
+    run_grid,
+)
+from term_deposit.models import build_models
 
 
 @pytest.fixture(scope="module")
@@ -28,6 +34,18 @@ def test_leakage_shows_up_as_a_better_score(grid):
             boosted.loc[(split, "with duration"), "roc_auc"]
             > boosted.loc[(split, "no duration"), "roc_auc"]
         ), split
+
+
+def test_the_reference_model_actually_exists():
+    assert REFERENCE_MODEL in build_models()
+
+
+def test_reference_comparison_reports_paired_uncertainty(dated):
+    comparison = reference_comparison(dated.iloc[:6000])
+    assert set(comparison.metric) == {"roc_auc", "pr_auc"}
+    for _, row in comparison.iterrows():
+        for interval in (row.logistic_regression_ci, row.gradient_boosting_ci, row.delta_ci):
+            assert interval[0] <= interval[1]
 
 
 def test_the_prior_baseline_ranks_no_better_than_chance(grid):
